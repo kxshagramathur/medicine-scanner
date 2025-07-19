@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Information Extractor</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f4f4f4;
+            color: #333;
+        }
+        .container {
+            max-width: 800px;
+            margin: 50px auto;
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #0056b3;
+            margin-bottom: 30px;
+        }
+        .drop-area {
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            padding: 50px;
+            text-align: center;
+            font-size: 1.2em;
+            color: #666;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        .drop-area.highlight {
+            background-color: #e9e9e9;
+            border-color: #007bff;
+        }
+        input[type="file"] {
+            display: none;
+        }
+        .button-container {
+            text-align: center;
+            margin-top: 20px;
+        }
+        .button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: background-color 0.3s ease;
+        }
+        .button:hover {
+            background-color: #0056b3;
+        }
+        #results {
+            margin-top: 30px;
+            padding: 20px;
+            background-color: #eaf6ff;
+            border: 1px solid #cceeff;
+            border-radius: 8px;
+        }
+        #results h2 {
+            color: #0056b3;
+            margin-top: 0;
+        }
+        #results pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            background-color: #f0f8ff;
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #cceeff;
+        }
+        #loading {
+            display: none;
+            text-align: center;
+            margin-top: 20px;
+            color: #0056b3;
+        }
+        .error {
+            color: red;
+            margin-top: 10px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Image Information Extractor</h1>
+
+        <div class="drop-area" id="drop-area">
+            <p>Drag & Drop an Image here, or click to select</p>
+            <input type="file" id="fileInput" accept="image/*">
+        </div>
+
+        <div class="button-container">
+            <button class="button" id="uploadButton" style="display: none;">Upload Image</button>
+        </div>
+
+        <div id="loading">Processing image... Please wait.</div>
+        <div id="error-message" class="error"></div>
+
+        <div id="results">
+            <h2>Processing Results:</h2>
+            <p>Upload an image to see the OCR and extracted information here.</p>
+        </div>
+    </div>
+
+    <script>
+        const dropArea = document.getElementById('drop-area');
+        const fileInput = document.getElementById('fileInput');
+        const uploadButton = document.getElementById('uploadButton');
+        const resultsDiv = document.getElementById('results');
+        const loadingDiv = document.getElementById('loading');
+        const errorMessageDiv = document.getElementById('error-message');
+
+        let selectedFile = null;
+
+        // Prevent default drag behaviors
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropArea.addEventListener(eventName, preventDefaults, false);
+            document.body.addEventListener(eventName, preventDefaults, false);
+        });
+
+        // Highlight drop area when item is dragged over it
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropArea.addEventListener(eventName, highlight, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropArea.addEventListener(eventName, unhighlight, false);
+        });
+
+        // Handle dropped files
+        dropArea.addEventListener('drop', handleDrop, false);
+
+        // Handle click to select file
+        dropArea.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            selectedFile = e.target.files[0];
+            if (selectedFile) {
+                uploadButton.style.display = 'block';
+                displayFileName(selectedFile.name);
+                errorMessageDiv.textContent = ''; // Clear any previous errors
+            } else {
+                uploadButton.style.display = 'none';
+                clearFileNameDisplay();
+            }
+        });
+
+        uploadButton.addEventListener('click', uploadFile);
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        function highlight() {
+            dropArea.classList.add('highlight');
+        }
+
+        function unhighlight() {
+            dropArea.classList.remove('highlight');
+        }
+
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            selectedFile = files[0];
+            if (selectedFile) {
+                uploadButton.style.display = 'block';
+                displayFileName(selectedFile.name);
+                errorMessageDiv.textContent = ''; // Clear any previous errors
+            } else {
+                uploadButton.style.display = 'none';
+                clearFileNameDisplay();
+            }
+        }
+
+        function displayFileName(name) {
+            const existingP = dropArea.querySelector('p:last-child');
+            if (existingP && existingP.classList.contains('file-name')) {
+                existingP.textContent = `Selected: ${name}`;
+            } else {
+                const fileNameP = document.createElement('p');
+                fileNameP.textContent = `Selected: ${name}`;
+                fileNameP.classList.add('file-name');
+                dropArea.appendChild(fileNameP);
+            }
+        }
+
+        function clearFileNameDisplay() {
+            const fileNameP = dropArea.querySelector('.file-name');
+            if (fileNameP) {
+                fileNameP.remove();
+            }
+            dropArea.querySelector('p:first-child').textContent = 'Drag & Drop an Image here, or click to select';
+        }
+
+        async function uploadFile() {
+            if (!selectedFile) {
+                errorMessageDiv.textContent = 'Please select an image file first.';
+                return;
+            }
+
+            loadingDiv.style.display = 'block';
+            resultsDiv.innerHTML = '<h2>Processing Results:</h2><p>Processing image...</p>';
+            errorMessageDiv.textContent = ''; // Clear previous errors
+
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+
+            try {
+                const response = await fetch('/upload_image/', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                console.log(data); // For debugging
+
+                loadingDiv.style.display = 'none';
+                if (data.error) {
+                    resultsDiv.innerHTML = `<h2>Processing Results:</h2><p class="error">${data.error}</p>`;
+                } else {
+                    resultsDiv.innerHTML = `
+                        <h2>Processing Results:</h2>
+                        <h3>Original Filename:</h3>
+                        <p>${data.filename}</p>
+                        <h3>OCR Text:</h3>
+                        <pre>${data.ocr_text}</pre>
+                        <h3>Extracted Information (from Gemma):</h3>
+                        <pre>${data.extracted_info}</pre>
+                    `;
+                }
+
+            } catch (error) {
+                loadingDiv.style.display = 'none';
+                errorMessageDiv.textContent = `Error during upload: ${error.message}`;
+                resultsDiv.innerHTML = `<h2>Processing Results:</h2><p class="error">An error occurred during processing.</p>`;
+                console.error('Error:', error);
+            } finally {
+                selectedFile = null;
+                uploadButton.style.display = 'none';
+                clearFileNameDisplay();
+                fileInput.value = ''; // Clear file input
+            }
+        }
+    </script>
+</body>
+</html>
